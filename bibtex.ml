@@ -197,13 +197,14 @@ let find_abbrev_in_table a = Hashtbl.find abbrev_table a
 
 exception Kill
 
-let rec expand_list names = function
+let rec expand_list ?(concat=true) names = function
   | [] -> []
   | ((Id s) as a) :: rem ->
     begin
       try
         let v = find_abbrev_in_table s in
-        concat_atom_lists v (expand_list names rem)
+        if concat then concat_atom_lists v (expand_list names rem)
+        else v @ expand_list ~concat:false names rem
       with Not_found ->
         try
           let ev = Hashtbl.find event_table s in
@@ -215,16 +216,35 @@ let rec expand_list names = function
             | Long ->
               (try List.assoc "long" ev.ev_values with Not_found -> [ Id s ])
           in
+          assert concat;
           concat_atom_lists l (expand_list names rem)
         with Not_found ->
-          concat_atom_lists [ a ] (expand_list names rem)
+          concat_atom_lists [ a ] (expand_list ~concat names rem)
     end
   | ((String _) as a) :: rem ->
+    assert concat;
     concat_atom_lists [a] (expand_list names rem)
 
 let rec expand_fields names = function
   | [] ->  []
-  | (n,l) :: rem -> (n, expand_list names l) :: (expand_fields names rem)
+  | (n,l) :: rem ->
+    if n = "author" then
+      (* replace abbreviations in the list of authors *)
+      match l with
+      | [ String s ] ->
+        (* not efficient, but the list of authors should be small anyway *)
+        let l  = Str.split (Str.regexp " and ") s in
+        let l = List.map (fun s -> Id s) l in
+        let l = expand_list ~concat:false names l in
+        let rec rebuild = function
+          | [ Id s | String s ] -> s
+          | (Id s | String s) :: l -> s ^ " and " ^ rebuild l
+          | _ -> assert false
+        in
+        (n, [ String (rebuild l) ]) :: expand_fields names rem
+      | _ -> assert false
+    else
+      (n, expand_list names l) :: (expand_fields names rem)
 
 let rec expand_abbrevs names biblio =
   fold
