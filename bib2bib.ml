@@ -33,6 +33,7 @@ let get_input_file_name f =
 
 let condition = ref Condition.True
 let event_condition = ref Condition.True
+let warn_condition = ref Condition.True
 
 let add_condition cr c =
   try
@@ -76,8 +77,11 @@ let args_spec =
      "<f> outputs resulting bibliography in PHP syntax in file <f>");
     ("-c", Arg.String (add_condition condition),
      "<c> adds <c> as a filter condition");
-    ("-e", Arg.String (add_condition event_condition ),
-     "<e> adds <e> as a filter condition for events");
+    ("-ec", Arg.String (add_condition event_condition),
+     "<c> adds <c> as a filter condition for events");
+    ("-wc", Arg.String (add_condition warn_condition),
+     "<c> generates a warning for each entry that does not satisfy condition \
+<c>");
     ("-w", Arg.Set Options.warn_error, "stop on warning");
     ("--warn-error", Arg.Set Options.warn_error, "stop on warning");
     ("-d", Arg.Set Options.debug, "debug flag");
@@ -285,7 +289,15 @@ let main () =
     Bibfilter.filter
       xref_expanded
       (fun e k f ->
-        Condition.evaluate_cond e k f !condition && KeySet.mem k filtered_entries)
+        if not (Condition.evaluate_cond e k f !warn_condition) then begin
+          if not !Options.quiet then
+            eprintf
+              "Warning: entry %s does not satisfy the input condition.\n"
+              k;
+          if !Options.warn_error then exit 2
+        end;
+        Condition.evaluate_cond e k f !condition
+        && KeySet.mem k filtered_entries)
   in
   if KeySet.cardinal matching_keys = 0 then
     begin
