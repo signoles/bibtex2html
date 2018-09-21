@@ -56,39 +56,39 @@ rule token = parse
   | space +
       { token lexbuf }
   | '@' space*
-    ([^ ' ' '\t' '\n' '\r' '{' '(']+ as entry_type) space*
-    (('{' | '(') as delim) space*
-       { serious := true;
-	 start_delim := delim;
-	 match String.lowercase_ascii entry_type with
-	   | "string" ->
-	       Tabbrev
-	   | "comment" ->
-	       reset_string_buffer ();
-               comment lexbuf;
-               serious := false;
-               Tcomment (get_stored_string ())
-	   | "preamble" ->
-	       Tpreamble
-	   |  et ->
-		Tentry (entry_type, key lexbuf)
-       }
+      ([^ ' ' '\t' '\n' '\r' '{' '(']+ as entry_type) space*
+      (('{' | '(') as delim) space*
+      { serious := true;
+        start_delim := delim;
+        match String.lowercase_ascii entry_type with
+        | "string" ->
+          Tabbrev
+        | "comment" ->
+          reset_string_buffer ();
+          comment lexbuf;
+          serious := false;
+          Tcomment (get_stored_string ())
+        | "preamble" ->
+          Tpreamble
+        |  et ->
+          Tentry (entry_type, key lexbuf)
+      }
   | '=' { if !serious then Tequal else token lexbuf }
   | '#' { if !serious then Tsharp else token lexbuf }
   | ',' { if !serious then Tcomma else token lexbuf }
   | '{' { if !serious then begin
-	    reset_string_buffer ();
-	    brace lexbuf;
-	    Tstring (get_stored_string ())
-          end else
-	    token lexbuf }
+    reset_string_buffer ();
+    brace lexbuf;
+    Tstring (get_stored_string ())
+  end else
+      token lexbuf }
   | ('}' | ')') as d
-        { if !serious then begin
-	    check_delim d;
-	    serious := false;
-	    Trbrace
-	  end else
-	    token lexbuf }
+      { if !serious then begin
+	check_delim d;
+	serious := false;
+	Trbrace
+      end else
+	  token lexbuf }
   | [^ ' ' '\t' '\n' '\r' '{' '}' '(' ')' '=' '#' ',' '"' '@']+
       { if !serious then
 	  Tident (Lexing.lexeme lexbuf)
@@ -96,64 +96,64 @@ rule token = parse
           token lexbuf }
   | "\""
       { if !serious then begin
-	  reset_string_buffer ();
-          string lexbuf;
-          Tstring (get_stored_string ())
-	end else
+	reset_string_buffer ();
+        string lexbuf;
+        Tstring (get_stored_string ())
+      end else
 	  token lexbuf }
   | eof { EOF }
   | _   { token lexbuf }
 
-and string = parse
-  | '{'
-      { store_string_char '{';
-      	brace lexbuf;
-	store_string_char '}';
-	string lexbuf
-      }
-  | '"'
-      { () }
-  | "\\\""
-      { store_string_char '\\';
-        store_string_char '"';
-	string lexbuf}
-  | eof
-      { failwith "unterminated string" }
-  | _
-      { let c = Lexing.lexeme_char lexbuf 0 in
-	store_string_char c;
-        string lexbuf }
+  and string = parse
+    | '{'
+        { store_string_char '{';
+      	  brace lexbuf;
+	  store_string_char '}';
+	  string lexbuf
+        }
+    | '"'
+        { () }
+    | "\\\""
+        { store_string_char '\\';
+          store_string_char '"';
+	  string lexbuf}
+    | eof
+        { failwith "unterminated string" }
+    | _
+        { let c = Lexing.lexeme_char lexbuf 0 in
+	  store_string_char c;
+          string lexbuf }
 
-and brace = parse
-  | '{'
-      { store_string_char '{';
-      	brace lexbuf;
-	store_string_char '}';
-	brace lexbuf
-      }
-  | '}'
-      { () }
-  | eof
-      { failwith "unterminated string" }
-  | _
-      { let c = Lexing.lexeme_char lexbuf 0 in
-	store_string_char c;
-        brace lexbuf }
+  and brace = parse
+    | '{'
+        { store_string_char '{';
+      	  brace lexbuf;
+	  store_string_char '}';
+	  brace lexbuf
+        }
+    | '}'
+        { () }
+    | eof
+        { failwith "unterminated string" }
+    | _
+        { let c = Lexing.lexeme_char lexbuf 0 in
+	  store_string_char c;
+          brace lexbuf }
 
-and key = parse
-  | [^ ' ' '\t' '\n' '\r' ',']+
-    { lexeme lexbuf }
-  | eof
-  | _
-    { raise Parsing.Parse_error }
+  and key = parse
+    | [^ ' ' '\t' '\n' '\r' ',']+
+        { lexeme lexbuf }
+    | eof
+    | _
+        { raise Parsing.Parse_error }
 
-and comment = parse
-  | '{'
-      { comment lexbuf; comment lexbuf }
-  | [^ '}' '@'] as c
-      { store_string_char c;
-        comment lexbuf }
-  | eof
-      { () }
-  | _
-      { () }
+  and comment = parse
+    | '{'
+        { comment lexbuf; comment lexbuf }
+    | [^ '}' '@'] as c
+        { store_string_char c;
+          comment lexbuf }
+    | eof
+        { () }
+    | _
+        { () }

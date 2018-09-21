@@ -69,7 +69,9 @@ command:
  | Tabbrev Tident Tequal sharp_string_list Trbrace
      { Abbrev (String.lowercase_ascii $2,$4) }
  | entry Tcomma comma_field_list Trbrace
-     { let et,key = $1 in Entry (String.lowercase_ascii et, key, $3) }
+     { let et,key = $1 in
+       if et = "event" then Event (key, $3)
+       else Entry (String.lowercase_ascii et, key, $3) }
 ;
 
 entry:

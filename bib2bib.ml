@@ -32,11 +32,12 @@ let get_input_file_name f =
   input_file_names := f :: !input_file_names
 
 let condition = ref Condition.True
+let event_condition = ref Condition.True
 
-let add_condition c =
+let add_condition cr c =
   try
     let c = Parse_condition.condition c in
-    condition := if !condition = Condition.True then c
+    cr := if !cr = Condition.True then c
     else Condition.And(!condition,c)
   with
       Condition_lexer.Lex_error msg ->
@@ -50,6 +51,8 @@ let add_condition c =
 let expand_abbrevs = ref false
 
 let expand_xrefs = ref false
+
+let event_names = ref Bibtex.Normal
 
 let no_comment = ref false
 
@@ -71,7 +74,10 @@ let args_spec =
      "<f> uses <f> as name for output citations file");
     ("--php-output", Arg.String (fun f -> php_output_file_name := f),
      "<f> outputs resulting bibliography in PHP syntax in file <f>");
-    ("-c", Arg.String (add_condition),"<c> adds <c> as a filter condition");
+    ("-c", Arg.String (add_condition condition),
+     "<c> adds <c> as a filter condition");
+    ("-e", Arg.String (add_condition event_condition ),
+     "<e> adds <e> as a filter condition for events");
     ("-w", Arg.Set Options.warn_error, "stop on warning");
     ("--warn-error", Arg.Set Options.warn_error, "stop on warning");
     ("-d", Arg.Set Options.debug, "debug flag");
@@ -98,6 +104,10 @@ let args_spec =
      "expand the abbreviations");
     ("--expand-xrefs", Arg.Unit (fun () -> expand_xrefs := true),
      "expand the cross-references");
+    ("--short-event-names", Arg.Unit (fun () -> event_names := Short),
+     "use short name when expanding event abbreviations");
+    ("--long-event-names", Arg.Unit (fun () -> event_names := Long),
+     "use long name when expanding event abbreviations");
     ("--version", Arg.Unit (fun () -> Copying.banner "bib2bib"; exit 0),
      "print version and exit");
     ("--warranty",
@@ -253,7 +263,8 @@ let main () =
     end;
   if !input_file_names = [] then input_file_names := [""];
   if !Options.debug then begin
-    Condition.print !condition; printf "\n"
+    Condition.print !condition; printf "\n";
+    Condition.print !event_condition; printf " (event)\n";
   end;
   let all_entries =
     List.fold_right
@@ -262,11 +273,19 @@ let main () =
       !input_file_names
       empty_biblio
   in
-  let abbrv_expanded = Bibtex.expand_abbrevs all_entries in
+  (* event condition must be filtered before abbrev expansion *)
+  let filtered_entries =
+    Bibfilter.filter_events
+      all_entries
+      (fun e k f -> Condition.evaluate_cond e k f !event_condition)
+  in
+  let abbrv_expanded = Bibtex.expand_abbrevs !event_names all_entries in
   let xref_expanded = Bibtex.expand_crossrefs abbrv_expanded in
   let matching_keys =
-    Bibfilter.filter xref_expanded
-      (fun e k f -> Condition.evaluate_cond e k f !condition)
+    Bibfilter.filter
+      xref_expanded
+      (fun e k f ->
+        Condition.evaluate_cond e k f !condition && KeySet.mem k filtered_entries)
   in
   if KeySet.cardinal matching_keys = 0 then
     begin

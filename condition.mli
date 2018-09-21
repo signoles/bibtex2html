@@ -38,7 +38,7 @@ type condition =
 
 *)
 
-val evaluate_cond : 
+val evaluate_cond :
   string -> string -> (string * Bibtex.atom list) list -> condition -> bool
 
 val print : condition -> unit

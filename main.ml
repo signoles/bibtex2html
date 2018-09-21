@@ -306,7 +306,7 @@ let translate fullname =
   end;
   format_list
     (if !expand_abbrev_in_bib_output then
-       Bibtex.expand_abbrevs input_bib
+        Bibtex.expand_abbrevs Normal input_bib
      else input_bib)
     sb
     (if !use_cite_file then

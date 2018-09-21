@@ -16,6 +16,11 @@
 
 (*s Datatype for BibTeX bibliographies. *)
 
+type event_names =
+  | Short
+  | Normal
+  | Long
+
 type entry_type = string
 
 type key = string
@@ -31,6 +36,20 @@ type command =
   | Preamble of atom list
   | Abbrev of string * atom list
   | Entry  of entry_type * key * (string * atom list) list
+  | Event  of key * (string * atom list) list
+
+type event =
+    { ev_values: (string * atom list) list;
+      mutable ev_killed: bool; }
+
+let event_table: (key, event) Hashtbl.t = Hashtbl.create 97
+
+let remove_event k =
+  try
+    let ev = Hashtbl.find event_table k in
+    ev.ev_killed <- true
+  with Not_found ->
+    ()
 
 (*s biblio is stored as a list. Beware, this in reverse order: the
    first entry is at the end of the list. This is intentional! *)
@@ -55,7 +74,12 @@ let find_entry key biblio =
       | _ :: b -> find key b
   in find (String.lowercase_ascii key) biblio
 
-let add_new_entry command biblio = command :: biblio
+let add_new_entry command biblio =
+  (match command with
+  | Event(key, l) ->
+    Hashtbl.replace event_table key { ev_values = l; ev_killed = false;}
+  | Comment _ | Preamble _ | Abbrev _ | Entry _ -> ());
+  command :: biblio
 
 let rec remove_entry key biblio =
   match biblio with
@@ -171,35 +195,53 @@ let _ = List.iter (fun (a,l) -> add_abbrev a l) month_env
 
 let find_abbrev_in_table a = Hashtbl.find abbrev_table a
 
-let rec expand_list = function
+exception Kill
+
+let rec expand_list names = function
   | [] -> []
   | ((Id s) as a) :: rem ->
-      begin
-	try
-	  let v = find_abbrev_in_table s in
-	  concat_atom_lists v (expand_list rem)
-	with Not_found ->
-	  concat_atom_lists [a] (expand_list rem)
-      end
+    begin
+      try
+        let v = find_abbrev_in_table s in
+        concat_atom_lists v (expand_list names rem)
+      with Not_found ->
+        try
+          let ev = Hashtbl.find event_table s in
+          if ev.ev_killed then raise Kill;
+          let l = match names with
+            | Short -> [ String (String.uppercase_ascii s) ]
+            | Normal ->
+              (try List.assoc "name" ev.ev_values with Not_found -> [ Id s ])
+            | Long ->
+              (try List.assoc "long" ev.ev_values with Not_found -> [ Id s ])
+          in
+          concat_atom_lists l (expand_list names rem)
+        with Not_found ->
+          concat_atom_lists [ a ] (expand_list names rem)
+    end
   | ((String _) as a) :: rem ->
-      concat_atom_lists [a] (expand_list rem)
+    concat_atom_lists [a] (expand_list names rem)
 
-let rec expand_fields = function
+let rec expand_fields names = function
   | [] ->  []
-  | (n,l) :: rem -> (n, expand_list l) :: (expand_fields rem)
+  | (n,l) :: rem -> (n, expand_list names l) :: (expand_fields names rem)
 
-let rec expand_abbrevs biblio =
+let rec expand_abbrevs names biblio =
   fold
     (fun command accu ->
        match command with
-	 | Abbrev (a,l) ->
-	     let s = expand_list l in
-	     add_abbrev a s;
-	     accu
-	 | Entry (t,k,f) ->
-	     Entry (t,k,expand_fields f) :: accu
-	 | e ->
-	     e :: accu)
+       | Abbrev (a,l) ->
+         let s = expand_list names l in
+         add_abbrev a s;
+         accu
+       | Entry (t,k,f) ->
+         (try Entry (t,k,expand_fields names f) :: accu
+          with Kill -> accu)
+       | Event (k,f) ->
+         (try Event (k,expand_fields names f) :: accu
+          with Kill -> accu)
+ | e ->
+     e :: accu)
     biblio
     []
 
@@ -289,11 +331,12 @@ let sort comp bib =
   let comments,preambles,abbrevs,entries =
     List.fold_left
       (fun (c,p,a,e) command ->
-	 match command with
-	   | Comment _ -> (command::c,p,a,e)
-	   | Preamble _ -> (c,command::p,a,e)
-	   | Abbrev _ -> (c,p,command::a,e)
-	   | Entry _ -> (c,p,a,command::e))
+        match command with
+        | Comment _ -> (command::c,p,a,e)
+        | Preamble _ -> (c,command::p,a,e)
+        | Abbrev _ -> (c,p,command::a,e)
+        | Entry _
+        | Event _ -> (c,p,a,command::e))
       ([],[],[],[])
       bib
   in

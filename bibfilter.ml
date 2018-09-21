@@ -22,19 +22,38 @@ open Bibtex
 let debug = false
 
 (*s [filter bib f] returns the list of keys of [bib] whose fields
-    satisfy the filter criterion [f] *)
+  satisfy the filter criterion [f]. *)
 
 let filter biblio criterion =
   Bibtex.fold
     (fun entry keys ->
-       match entry with
-	   Entry(entry_type,key,fields)
-	     when criterion entry_type key fields ->
-	       KeySet.add key keys
-	 | _ -> keys)
+      match entry with
+        Entry(entry_type,key,fields)
+          when criterion entry_type key fields ->
+            KeySet.add key keys
+      | _ -> keys)
     biblio
     KeySet.empty
 
+(*s [filter_events bib f] returns the set of keys of [bib] whose events (if any)
+    satisfy the filter criterion [f]. *)
+
+let filter_events biblio criterion =
+  Bibtex.fold
+    (fun entry keys ->
+      match entry with
+      | Event(key,fields) ->
+        if criterion "event" key fields then KeySet.add key keys
+        else begin
+          Bibtex.remove_event key;
+          keys
+        end;
+      | Entry(_, key, _) ->
+        KeySet.add key keys
+      | Comment _ | Preamble _ | Abbrev _ ->
+        keys)
+    biblio
+    KeySet.empty
 
 (*s [needed_keys biblio field value keys] returns the set of keys
     [keys] augmented with the needed keys for [value] *)
@@ -43,66 +62,66 @@ let rec needed_keys_for_field biblio field value keys abbrevs =
   if field = "crossref"
   then
     match value with
-	[String(s)] ->
-	  if not (KeySet.mem s keys) then
-	    begin
-	      try
-		let e = find_entry s biblio
-		in
-		if debug then begin
-		  eprintf "We need additional crossref %s\n" s
-		end;
-		needed_keys_for_entry biblio (KeySet.add s keys) abbrevs e
-	      with Not_found ->
-		if not !Options.quiet then
-		  eprintf "Warning: cross-reference \"%s\" not found.\n" s;
-		if !Options.warn_error then exit 2;
-		(keys,abbrevs)
-	    end
-	  else (keys,abbrevs)
-      | _ ->
-	  if not !Options.quiet then
-	    eprintf "Warning: cross-references must be constant strings\n";
-	  if !Options.warn_error then exit 2;
-	  (keys,abbrevs)
+      [String(s)] ->
+	if not (KeySet.mem s keys) then
+	  begin
+	    try
+	      let e = find_entry s biblio
+	      in
+	      if debug then begin
+		eprintf "We need additional crossref %s\n" s
+	      end;
+	      needed_keys_for_entry biblio (KeySet.add s keys) abbrevs e
+	    with Not_found ->
+	      if not !Options.quiet then
+		eprintf "Warning: cross-reference \"%s\" not found.\n" s;
+	      if !Options.warn_error then exit 2;
+	      (keys,abbrevs)
+	  end
+	else (keys,abbrevs)
+    | _ ->
+      if not !Options.quiet then
+	eprintf "Warning: cross-references must be constant strings\n";
+      if !Options.warn_error then exit 2;
+      (keys,abbrevs)
   else
     List.fold_right
       (fun a (keys,abbrevs) ->
-	 match a with
-	     Id(id) ->
-	       let id = String.lowercase_ascii id in
-	       if not (KeySet.mem id abbrevs)
-	       then
-		 try
-		   let e = find_abbrev id biblio in
-		   if debug then begin
-		     eprintf "We need additional abbrev %s\n" id
-		   end;
-		   needed_keys_for_entry biblio keys (KeySet.add id abbrevs) e
-		 with Not_found ->
-		   if abbrev_is_implicit id then (keys,abbrevs)
-		   else
-		     begin
-		       if not !Options.quiet then
-			 eprintf "Warning: string \"%s\" not found.\n" id;
-		       if !Options.warn_error then exit 2;
-		       (keys,abbrevs)
-		     end
-	       else (keys,abbrevs)
-	   | _ -> (keys,abbrevs))
+	match a with
+	  Id(id) ->
+	    let id = String.lowercase_ascii id in
+	    if not (KeySet.mem id abbrevs)
+	    then
+	      try
+		let e = find_abbrev id biblio in
+		if debug then begin
+		  eprintf "We need additional abbrev %s\n" id
+		end;
+		needed_keys_for_entry biblio keys (KeySet.add id abbrevs) e
+	      with Not_found ->
+		if abbrev_is_implicit id then (keys,abbrevs)
+		else
+		  begin
+		    if not !Options.quiet then
+		      eprintf "Warning: string \"%s\" not found.\n" id;
+		    if !Options.warn_error then exit 2;
+		    (keys,abbrevs)
+		  end
+	    else (keys,abbrevs)
+	| _ -> (keys,abbrevs))
       value
       (keys,abbrevs)
 
 and needed_keys_for_entry biblio keys abbrevs = function
-    Entry(entry_type,key,fields) ->
-      List.fold_right
-	(fun (field,value) (keys,abbrevs) ->
-           (*i eprintf "Field : %s\n" field; i*)
-	   needed_keys_for_field biblio field value keys abbrevs)
-	fields
-	(keys,abbrevs)
+  | Entry(entry_type,key,fields) ->
+    List.fold_right
+      (fun (field,value) (keys,abbrevs) ->
+        (*i eprintf "Field : %s\n" field; i*)
+        needed_keys_for_field biblio field value keys abbrevs)
+      fields
+      (keys,abbrevs)
   | Abbrev(field,value) ->
-      needed_keys_for_field biblio field value keys abbrevs
+    needed_keys_for_field biblio field value keys abbrevs
   | _ -> (keys,abbrevs)
 
 

@@ -18,12 +18,20 @@
 
 open Bibtex
 
-(*s [filter bib f] returns the set of keys of [bib] whose fields
+(*s [filter ~acc bib f] returns the list of keys of [bib] whose fields
+  satisfy the filter criterion [f]. [acc] is the accumulator. *)
+
+val filter :
+  biblio ->
+    (entry_type -> key -> ((string * atom list) list) -> bool) ->
+      KeySet.t
+
+(*s [filter_events bib f] returns the set of keys of [bib] whose events (if any)
     satisfy the filter criterion [f]. *)
 
-val filter : 
-  biblio -> 
-    (entry_type -> key -> ((string * atom list) list) -> bool) -> 
+val filter_events:
+  biblio ->
+    (entry_type -> key -> ((string * atom list) list) -> bool) ->
       KeySet.t
 
 (*s [saturate bib s] returns the smallest part of the bibliography

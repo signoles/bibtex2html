@@ -68,18 +68,21 @@ let macros_in_preamble s =
 let rec expand biblio =
   Bibtex.fold
     (fun command accu ->
-       match command with
-	 | Abbrev (a,l) ->
-	     let s = expand_list l in
-	     add_abbrev a s;
-	     accu
-	 | Entry (t,k,f) ->
-	     (t,k,expand_fields f) :: accu
-	 | Preamble l ->
-	     let s = expand_list l in
-	     macros_in_preamble s;
-	     accu
-	 | Comment _ -> accu)
+      match command with
+      | Abbrev (a,l) ->
+        let s = expand_list l in
+        add_abbrev a s;
+        accu
+      | Entry (t,k,f) ->
+        (t,k,expand_fields f) :: accu
+      | Event (k,f) ->
+        (* just ignore events when expanding *)
+        accu
+      | Preamble l ->
+        let s = expand_list l in
+        macros_in_preamble s;
+        accu
+      | Comment _ -> accu)
     biblio
     []
 

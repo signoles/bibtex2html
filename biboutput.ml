@@ -84,7 +84,7 @@ let print_link_field ch = function
       print_atom_list true ch l
 
 let print_command remove rename html html_file ch keys = function
-  | Comment s ->
+   | Comment s ->
       if html then output_string ch "<pre>\n";
       output_string ch ("@comment{{" ^ s ^ "}}\n");
       if html then output_string ch "</pre>\n";
@@ -107,6 +107,8 @@ let print_command remove rename html html_file ch keys = function
 	  if html then output_string ch "</pre>\n";
 	  output_string ch "\n"
 	end
+  | Event _ ->
+    () (* do not print events *)
   | Entry (entry_type,key,fields) ->
       if needs_output key keys then
 	begin
@@ -143,7 +145,6 @@ let print_command remove rename html html_file ch keys = function
 	  if html then output_string ch "</pre>\n";
 	  (*if html then Html.close_balise ch "p";*)
 	  output_string ch "\n"
-
 	end
 
 (*s PHP output *)
@@ -217,6 +218,8 @@ let php_print_command index remove rename ch keys =
 	  output_string ch "\n"
 	end
 *)
+  | Event _ ->
+    index (* do not print events *)
   | Entry (entry_type,key,fields) ->
       if needs_output key keys then
 	begin

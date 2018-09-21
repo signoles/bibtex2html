@@ -31,6 +31,7 @@ type command =
   | Preamble of atom list
   | Abbrev of string * atom list
   | Entry  of entry_type * key * (string * atom list) list
+  | Event  of key * (string * atom list) list
 
 type biblio
 
@@ -43,6 +44,10 @@ val empty_biblio : biblio
    is supposed not to exists yet in [b]. *)
 
 val add_new_entry : command -> biblio -> biblio
+
+(*s [remove_event k] removes an event from the event table. *)
+
+val remove_event: key -> unit
 
 (*s [merge_biblios b1 b2] merges biblios [b1] and [b2]. Commands in the
    resulting biblio are the commands of b1, then the commands of b2,
@@ -81,10 +86,14 @@ val find_abbrev : key -> biblio -> command
 (*s expansion of abbreviations. [expand_abbrevs bib] returns a new
    bibliography where all strings have been expanded *)
 
-val expand_abbrevs : biblio -> biblio
+type event_names =
+  | Short
+  | Normal
+  | Long
+
+val expand_abbrevs : event_names -> biblio -> biblio
 
 val expand_crossrefs : biblio -> biblio
-
 
 (*s sorting bibliography
 
