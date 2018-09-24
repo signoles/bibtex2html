@@ -1,4 +1,14 @@
 
+ o bib2bib: added option -wc <c> that emits a warning if condition <c> is not
+   satisfied
+ o bib2bib: added type @event for conferences, journals, etc. Keys of events are
+   expanded if --expand is set. Special fields for events are 'name' and 'long'.
+ o bib2bib: added options --short-event-names and --long-event-names that
+   expands events to their short names (based on their keys) and long names
+   (based on the content of field 'long'), respectively. 
+   By default, events are expanded to the content of field 'name'.
+ o bib2bib: added option -ec that filters entries if the given condition about
+   the event is satisfied.
  o added a 'make uninstall'
 
 Version 1.99, March 23, 2018
